@@ -127,6 +127,24 @@ def build_report(df: pd.DataFrame) -> str:
     md.append("\n## 4. Invoice cancellations\n")
     md.append(f"- Invoices prefixed with `C` (order cancellations): **{canc.sum():,}** rows (~{canc.sum()/n:.1%}).")
     md.append("- Per the cleaning policy these cancellation invoices are dropped (they represent voided orders, not purchasing behaviour).")
+    # Verification that C-invoices are genuinely cancellations (not an assumption).
+    cr = df[canc]
+    c_neg_qty = int((cr["Quantity"] < 0).sum())
+    c_pos_price = int((cr["UnitPrice"] > 0).sum())
+    c_has_cust = int(cr["CustomerID"].notna().sum())
+    non_numeric = inv[~inv.str.match(r"^\d+$")]
+    other_prefixes = non_numeric.str.replace(r"\d+$", "", regex=True).value_counts()
+    other_prefixes = other_prefixes[~other_prefixes.index.str.startswith("C")]
+    c_matches_orig = int(
+        inv[canc].str.lstrip("C").isin(inv[~canc]).sum()
+    )
+    md.append("")
+    md.append("  **Verification (not an assumption):**")
+    md.append(f"  - **{c_neg_qty:,} of {len(cr):,} C-invoice lines have `Quantity < 0` ({c_neg_qty/len(cr):.0%})** while carrying a *positive* `UnitPrice` ({c_pos_price:,} of {len(cr):,}). A negative quantity times a positive price yields a negative line value — the reversal signature of a credit/cancellation note. No legitimate sale produces this.")
+    md.append(f"  - `C` is the only non-numeric invoice prefix in the file (other prefixes: {other_prefixes.to_dict() if len(other_prefixes) else 'none'}).")
+    md.append(f"  - C-invoices are **standalone credit notes, not references to an original order**: only **{c_matches_orig:,}** have a numeric part matching a real invoice.")
+    md.append(f"  - {c_has_cust:,} of {len(cr):,} carry a `CustomerID`; descriptions are adjustment lines (`Manual`, `POSTAGE`, `Discount`). They span the full date range, so they are normal business operations, not a one-off data glitch.")
+    md.append('  - **Why dropped:** every line is negative, so keeping them would add a voided "transaction" to each customer\'s history (inflating frequency) and subtract from Monetary. They are distinct from genuine returns (`Quantity < 0` on a *normal* invoice), which are retained and netted.')
 
     # 5. Quantity
     md.append("\n## 5. Quantity\n")

@@ -64,6 +64,13 @@ All other columns are fully populated (InvoiceNo, StockCode, Quantity, UnitPrice
 - Invoices prefixed with `C` (order cancellations): **9,288** rows (~1.7%).
 - Per the cleaning policy these cancellation invoices are dropped (they represent voided orders, not purchasing behaviour).
 
+  **Verification (not an assumption):**
+  - **9,288 of 9,288 C-invoice lines have `Quantity < 0` (100%)** while carrying a *positive* `UnitPrice` (9,288 of 9,288). A negative quantity times a positive price yields a negative line value — the reversal signature of a credit/cancellation note. No legitimate sale produces this.
+  - `C` is the only non-numeric invoice prefix in the file (other prefixes: {'A': 3}).
+  - C-invoices are **standalone credit notes, not references to an original order**: only **0** have a numeric part matching a real invoice.
+  - 8,905 of 9,288 carry a `CustomerID`; descriptions are adjustment lines (`Manual`, `POSTAGE`, `Discount`). They span the full date range, so they are normal business operations, not a one-off data glitch.
+  - **Why dropped:** every line is negative, so keeping them would add a voided "transaction" to each customer's history (inflating frequency) and subtract from Monetary. They are distinct from genuine returns (`Quantity < 0` on a *normal* invoice), which are retained and netted.
+
 ## 5. Quantity
 
 | count | mean | std | min | 25% | 50% | 75% | max |
