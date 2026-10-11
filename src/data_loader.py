@@ -9,9 +9,12 @@ Loading policy
    invoice is a single transaction, so every line of an invoice belongs to the
    same customer. Where the data structure allows it, this recovers genuine
    customer attribution instead of discarding legitimate rows.
-3. **No rows are dropped and no columns are dropped** at this stage. Every
-   downstream cleaning decision is explicit and opt-in, so the caller can
-   reproduce the raw baseline at any time.
+3. Apply **invoice propagation** and **Description backfill** (recover, never drop).
+4. Drop **exact duplicate rows** (byte-identical across all columns).
+5. **No columns are dropped at any stage.** Every remaining row-level
+   cleaning decision (unattributable CustomerID, cancellations, zero price,
+   zero quantity) is explicit and opt-in, so the caller can reproduce the raw
+   baseline at any time.
 
 Structural note (verified on this dataset)
 ------------------------------------------
@@ -123,18 +126,40 @@ def backfill_description(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def load_clean(path: Path = DATA_PATH) -> pd.DataFrame:
-    """Load raw data and apply both recovery steps.
+def drop_exact_duplicates(df: pd.DataFrame) -> pd.DataFrame:
+    """Drop rows that are byte-identical across every column.
 
-    Returns the full dataframe: all rows, all columns. CustomerID is recovered
-    via invoice propagation where the data structure allows it; Description is
-    backfilled from the StockCode -> Description map. Rows that remain
-    unattributable are kept (with NaN CustomerID) so the caller can decide how
-    to handle them. No rows or columns are dropped at this stage.
+    Keeps the first occurrence of each distinct row. These are true duplicates
+    (all 8 columns equal), not legitimate multi-item invoice lines, and they
+    would double-count frequency and monetary value in the customer-level
+    aggregation if retained.
+
+    Verified on this dataset: 5,268 of 541,909 rows dropped (~1.0%). No customer
+    is present only in duplicated rows, so the customer count is unchanged
+    (4,372 before and after).
+    """
+    if df.empty:
+        return df
+    n_before = len(df)
+    out = df.drop_duplicates(keep="first")
+    n_dropped = n_before - len(out)
+    print(f"[data_loader] exact duplicates dropped: {n_dropped:,} of {n_before:,} rows")
+    return out
+
+
+def load_clean(path: Path = DATA_PATH) -> pd.DataFrame:
+    """Load raw data and apply all three recovery/cleaning steps.
+
+    Returns the full dataframe with all columns: CustomerID is recovered via
+    invoice propagation where the data structure allows it; Description is
+    backfilled from the StockCode -> Description map; exact duplicate rows are
+    dropped. Rows that remain unattributable are kept (with NaN CustomerID) so
+    the caller can decide how to handle them. No columns are dropped.
     """
     df = load_raw(path)
     df = propagate_customer_id(df)
     df = backfill_description(df)
+    df = drop_exact_duplicates(df)
     return df
 
 

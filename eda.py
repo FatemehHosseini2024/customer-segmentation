@@ -118,7 +118,7 @@ def build_report(df: pd.DataFrame) -> str:
     full_dups = df.duplicated().sum()
     key_cols = ["InvoiceNo", "StockCode", "CustomerID", "InvoiceDate"]
     key_dups = df.duplicated(subset=key_cols, keep=False).sum()
-    md.append(f"- Exact duplicate rows: **{full_dups:,}** — removed in the cleaning step.")
+    md.append(f"- Exact duplicate rows: **{full_dups:,}** — dropped in `src/data_loader.py` (`drop_exact_duplicates`, keep-first). Verified safe: no customer is present only in duplicated rows, so the customer count is unchanged (4,372 before and after).")
     md.append(f"- Rows sharing (InvoiceNo, StockCode, CustomerID, InvoiceDate): **{key_dups:,}**. Many are legitimate multi-item invoice lines, but the exact full-row duplicates above are the ones dropped.")
 
     # 4. Cancellations
@@ -194,11 +194,12 @@ def build_report(df: pd.DataFrame) -> str:
     # 12. Cleaning impact preview
     md.append("\n## 12. Cleaning policy impact (preview)\n")
     clean = df.dropna(subset=["CustomerID"]).copy()
+    clean = clean.drop_duplicates(keep="first")
     clean["InvoiceNo"] = clean["InvoiceNo"].astype(str)
     clean = clean[~clean["InvoiceNo"].str.startswith("C")]
     clean = clean[clean["UnitPrice"] > 0]
     clean = clean[clean["Quantity"] != 0]
-    md.append("Cleaning policy (as implemented): attempt **invoice propagation** to recover `CustomerID` (recovers 0 rows here — guest invoices are disjoint from customer-ID'd invoices); backfill `Description` from the `StockCode` → `Description` map (recovers 1,342 of 1,454); then drop rows whose `CustomerID` remains unattributable; drop `C`-prefix (cancellation) invoices; drop `UnitPrice <= 0`; drop `Quantity == 0`; retain & net returns (`Quantity < 0`). No columns are dropped at any stage.")
+    md.append("Cleaning policy (as implemented in `src/data_loader.py` → `load_clean`): attempt **invoice propagation** to recover `CustomerID` (recovers 0 rows here — guest invoices are disjoint from customer-ID'd invoices); backfill `Description` from the `StockCode` → `Description` map (recovers 1,342 of 1,454); drop **exact duplicate rows** (5,268, keep-first, no customer lost); then drop rows whose `CustomerID` remains unattributable; drop `C`-prefix (cancellation) invoices; drop `UnitPrice <= 0`; drop `Quantity == 0`; retain & net returns (`Quantity < 0`). No columns are dropped at any stage.")
     md.append("| Metric | Raw | After cleaning |")
     md.append("|---|---|---|")
     md.append(f"\n| Rows | {n:,} | {len(clean):,} ({len(clean)/n:.1%}) |")
@@ -206,7 +207,8 @@ def build_report(df: pd.DataFrame) -> str:
     md.append("\nPer-category drop counts (note: categories overlap, so their sum exceeds the total rows dropped):\n")
     md.append("| Category dropped | Rows |")
     md.append("|---|---|")
-    md.append(f"\n| Missing CustomerID | {int(miss['CustomerID']):,} |")
+    md.append(f"\n| Exact duplicate rows | {int(df.duplicated().sum()):,} |")
+    md.append(f"| Missing CustomerID | {int(miss['CustomerID']):,} |")
     md.append(f"| C-prefix (cancellation) invoices | {int(canc.sum()):,} |")
     md.append(f"| UnitPrice <= 0 | {int((df['UnitPrice'] <= 0).sum()):,} |")
     md.append(f"| Quantity == 0 | {int((df['Quantity'] == 0).sum()):,} |")

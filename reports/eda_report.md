@@ -56,7 +56,7 @@ All other columns are fully populated (InvoiceNo, StockCode, Quantity, UnitPrice
 
 ## 3. Duplicates
 
-- Exact duplicate rows: **5,268** — removed in the cleaning step.
+- Exact duplicate rows: **5,268** — dropped in `src/data_loader.py` (`drop_exact_duplicates`, keep-first). Verified safe: no customer is present only in duplicated rows, so the customer count is unchanged (4,372 before and after).
 - Rows sharing (InvoiceNo, StockCode, CustomerID, InvoiceDate): **20,365**. Many are legitimate multi-item invoice lines, but the exact full-row duplicates above are the ones dropped.
 
 ## 4. Invoice cancellations
@@ -166,11 +166,11 @@ Negative values (returns) and the long positive tail are expected; netting per c
 
 ## 12. Cleaning policy impact (preview)
 
-Cleaning policy (as implemented): attempt **invoice propagation** to recover `CustomerID` (recovers 0 rows here — guest invoices are disjoint from customer-ID'd invoices); backfill `Description` from the `StockCode` → `Description` map (recovers 1,342 of 1,454); then drop rows whose `CustomerID` remains unattributable; drop `C`-prefix (cancellation) invoices; drop `UnitPrice <= 0`; drop `Quantity == 0`; retain & net returns (`Quantity < 0`). No columns are dropped at any stage.
+Cleaning policy (as implemented in `src/data_loader.py` → `load_clean`): attempt **invoice propagation** to recover `CustomerID` (recovers 0 rows here — guest invoices are disjoint from customer-ID'd invoices); backfill `Description` from the `StockCode` → `Description` map (recovers 1,342 of 1,454); drop **exact duplicate rows** (5,268, keep-first, no customer lost); then drop rows whose `CustomerID` remains unattributable; drop `C`-prefix (cancellation) invoices; drop `UnitPrice <= 0`; drop `Quantity == 0`; retain & net returns (`Quantity < 0`). No columns are dropped at any stage.
 | Metric | Raw | After cleaning |
 |---|---|---|
 
-| Rows | 541,909 | 397,884 (73.4%) |
+| Rows | 541,909 | 392,692 (72.5%) |
 | Unique customers | 4,372 | 4,338 |
 
 Per-category drop counts (note: categories overlap, so their sum exceeds the total rows dropped):
@@ -178,6 +178,7 @@ Per-category drop counts (note: categories overlap, so their sum exceeds the tot
 | Category dropped | Rows |
 |---|---|
 
+| Exact duplicate rows | 5,268 |
 | Missing CustomerID | 135,080 |
 | C-prefix (cancellation) invoices | 9,288 |
 | UnitPrice <= 0 | 2,517 |
