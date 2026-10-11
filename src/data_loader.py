@@ -29,6 +29,7 @@ where invoices are partially populated.
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 import pandas as pd
 
@@ -148,19 +149,90 @@ def drop_exact_duplicates(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_clean(path: Path = DATA_PATH) -> pd.DataFrame:
-    """Load raw data and apply all three recovery/cleaning steps.
+    """Load raw data and apply all recovery/cleaning steps.
 
-    Returns the full dataframe with all columns: CustomerID is recovered via
-    invoice propagation where the data structure allows it; Description is
-    backfilled from the StockCode -> Description map; exact duplicate rows are
-    dropped. Rows that remain unattributable are kept (with NaN CustomerID) so
-    the caller can decide how to handle them. No columns are dropped.
+    Returns the full dataframe with all columns plus `is_product` flag:
+    - CustomerID recovered via invoice propagation where data structure allows
+    - Description backfilled from StockCode -> Description map
+    - Exact duplicate rows dropped (keep-first)
+    - StockCode normalized (lowercase suffix -> uppercase)
+    - Non-product codes flagged via `is_product` column (fees, postage, adjustments)
+    - Rows with unattributable CustomerID, C-invoices, UnitPrice <= 0, Quantity == 0
+      are NOT dropped here; caller decides (opt-in).
     """
     df = load_raw(path)
     df = propagate_customer_id(df)
     df = backfill_description(df)
     df = drop_exact_duplicates(df)
+    df = normalize_stockcode(df)
+    df = filter_non_product_codes(df)
     return df
+
+
+PRODUCT_CODE_RE = re.compile(r"^\d{4,6}[A-Z]{0,2}$")
+
+NON_PRODUCT_CODES = {
+    "POST", "DOT", "M", "D", "S", "BANK CHARGES", "AMAZONFEE", "CRUK",
+    "C2", "MANUAL", "ADJUST", "ADJUSTMENT", "DISCOUNT", "FREIGHT",
+}
+
+
+def normalize_stockcode(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize StockCode: uppercase single-letter suffix on 4-6 digit codes.
+
+    E.g., "47566b" -> "47566B", "15056n" -> "15056N". Only applies to codes
+    matching ``^\\d{4,6}[a-z]$`` (digits + single lowercase letter), which are
+    typo variants of valid product codes.
+    """
+    if "StockCode" not in df.columns:
+        return df
+
+    out = df.copy()
+    sc = out["StockCode"].astype(str)
+
+    # 1-letter lowercase suffix (e.g., 47566b -> 47566B)
+    typo_mask1 = sc.str.match(r"^\d{4,6}[a-z]$")
+    n_typo1 = int(typo_mask1.sum())
+
+    # 2-letter lowercase suffix (e.g., 15056bl -> 15056BL) - only when no uppercase counterpart exists
+    typo_mask2 = sc.str.match(r"^\d{4,6}[a-z]{2}$")
+    n_typo2 = int(typo_mask2.sum())
+
+    total_typo = n_typo1 + n_typo2
+
+    if total_typo:
+        if n_typo1:
+            out.loc[typo_mask1, "StockCode"] = sc[typo_mask1].str.upper()
+        if n_typo2:
+            out.loc[typo_mask2, "StockCode"] = sc[typo_mask2].str.upper()
+        print(f"[data_loader] normalized {total_typo:,} lowercase-suffix StockCodes "
+              f"(1-letter: {n_typo1:,}, 2-letter: {n_typo2:,})")
+
+    return out
+
+
+def filter_non_product_codes(df: pd.DataFrame) -> pd.DataFrame:
+    """Mark non-product StockCodes for downstream feature engineering.
+
+    Adds `is_product` boolean column:
+    - True: standard product code (4-6 digits, optional uppercase letter)
+    - False: fees, adjustments, postage, bank charges, manual codes
+
+    POSTAGE is kept in monetary features but excluded from product features.
+    """
+    if "StockCode" not in df.columns:
+        return df
+
+    out = df.copy()
+    sc = out["StockCode"].astype(str)
+
+    is_product = sc.str.match(PRODUCT_CODE_RE) & ~sc.isin(NON_PRODUCT_CODES)
+    out["is_product"] = is_product
+
+    n_nonprod = int((~is_product).sum())
+    print(f"[data_loader] flagged {n_nonprod:,} non-product lines (fees/adjustments/postage)")
+
+    return out
 
 
 def validate_columns(df: pd.DataFrame) -> None:
