@@ -1,0 +1,108 @@
+# Customer Segmentation (UCI Online Retail)
+
+Unsupervised customer segmentation of UK online-retail transactions. Builds customer-level **RFM + derived features** from the UCI Online Retail dataset and compares **K-Means**, **Agglomerative (Ward)** and **HDBSCAN** clustering on standardized raw features vs. PCA-reduced features, then selects the best segmentation with a multi-metric + bootstrap-stability decision rule. The chosen model is packaged with a scoring utility that assigns a new customer to a segment.
+
+See `PLAN.md` for the full implementation plan.
+
+## Project structure
+```
+customer segmentation/
+├── data/                  # input dataset (gitignored) -> Online Retail.xlsx
+├── outputs/               # generated artifacts (gitignored)
+├── models/                # persisted transformers + centroids (gitignored)
+├── reports/               # EDA report + CSV summaries
+├── src/                   # pipeline package
+│   ├── config.py          # paths, seed, feature list, hyperparameter grids
+│   ├── data_loader.py     # load + clean
+│   ├── features.py        # RFM + derived feature engineering
+│   ├── pca_pipeline.py    # StandardScaler + PCA (>=95% variance)
+│   ├── clustering.py      # K-Means / Agglomerative / HDBSCAN  x  {raw, pca}
+│   ├── evaluation.py      # Silhouette / Davies-Bouldin / Calinski-Harabasz + bootstrap ARI
+│   ├── selection.py       # decision rule + stability gate
+│   ├── reporting.py       # cluster profiles, segment labels, labels JSON
+│   └── scoring.py         # score_customer()
+├── eda.py                 # initial EDA (writes reports/eda_report.md)
+├── run_pipeline.py        # end-to-end entry point
+├── PLAN.md                # implementation plan
+├── .gitignore
+└── README.md
+```
+
+## Setup
+```bash
+python -m pip install -r requirements.txt
+```
+
+## Data
+Download `Online Retail.xlsx` from the UCI repository (dataset id 352) and place it at `data/Online Retail.xlsx`.
+
+## EDA (initial inspection)
+```bash
+python eda.py
+```
+Writes `reports/eda_report.md` (structure, missing values, duplicates, cancellations, anomalies, cardinality, date range, geography, monetary preview, cleaning-impact preview) and `reports/eda_missing.csv`.
+
+## Pipeline
+```bash
+python run_pipeline.py
+```
+Produces `outputs/metrics_summary.csv`, `outputs/cluster_profiles.csv`, `outputs/segment_labels.json`, `outputs/stability_report.csv`, `outputs/best_config.json`, and persists `models/scaler.joblib`, `models/pca.joblib`, `models/clusterer.joblib`, `models/centroids_or_medoids.joblib`.
+
+## Scoring a new customer
+```python
+from src.scoring import score_customer
+result = score_customer({
+    "recency_days": 30,
+    "frequency": 5,
+    "monetary_net": 420.0,
+    "avg_order_value": 84.0,
+    "avg_quantity_per_order": 8.0,
+    "tenure_days": 210,
+    "distinct_products": 12,
+    "return_rate": 0.0,
+})
+print(result)  # {"segment_id": ..., "label": ..., "confidence": ...}
+```
+
+## Reproducibility
+- `SEED = 42` used everywhere; K-Means `n_init=10`.
+- Reference/snapshot date = `max(InvoiceDate)` (deterministic).
+- `python run_pipeline.py` run twice yields identical `outputs/metrics_summary.csv` and `outputs/best_config.json`.
+
+## Methodology highlights
+- **Cleaning:** drop missing `CustomerID`; drop `C`-prefix (cancellation) invoices; drop `UnitPrice <= 0`; drop `Quantity == 0`; returns (`Quantity < 0`) are netted into Monetary (floored at 0).
+- **Features (8):** recency, frequency, monetary_net, avg_order_value, avg_quantity_per_order, tenure_days, distinct_products, return_rate.
+- **Algorithms:** K-Means, Agglomerative (Ward), HDBSCAN — each run on raw-standardized and PCA (≥95% variance) spaces.
+- **Selection rule:** best mean rank across Silhouette↑ / Davies–Bouldin↓ / Calinski–Harabasz↑, gated by bootstrap stability ARI ≥ 0.40 and smallest cluster ≥ 5%.
+
+## License
+Dataset: CC BY 4.0 (UCI). Code: as-is for this project.
+```
+
+That's a solid README. Let me write it.
+
+Now let me write PLAN.md (project-local, the finalized plan content). I'll write the complete plan. Let me reproduce the canonical plan content with the intro noting it's the project-local plan.
+
+Given token constraints, I'll write the PLAN.md with the full content (it's a deliverable). Let me write it.
+
+Let me batch the three writes: .gitignore, README.md, PLAN.md.</think>Creating the commit-ready files (`.gitignore`, `README.md`) and the project-local `PLAN.md` the user requested:<tool_call>write<arg_key>content</arg_key><arg_value># Sourced dataset and generated data (never commit the ~23 MB raw workbook or derived CSVs)
+/data/
+
+# Pipeline outputs and persisted models
+/outputs/
+/models/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
