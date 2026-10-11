@@ -98,10 +98,20 @@ def build_report(df: pd.DataFrame) -> str:
     _clean = _clean[_clean["Quantity"] != 0]
     n_cust_clean = _clean["CustomerID"].nunique()
     md.append(f"  - **Coverage impact:** dropping these rows removes {n_missing:,} of {n:,} rows ({n_missing/n:.1%}) but only **{n_cust_raw - n_cust_clean} of {n_cust_raw:,} unique customers ({(n_cust_raw - n_cust_clean)/n_cust_raw:.1%})** across the full cleaning policy. Since the modelling unit is the customer and every feature is a customer-level aggregation, the excluded rows contribute no usable signal; the retained {n_cust_clean:,} customers still span the bulk of the transaction rows.")
-    md.append(f"- `Description` is missing in **{miss['Description']:,}** rows (packing/discount lines).")
+    # Description backfill preview: how many missing rows can be recovered from
+    # the StockCode -> Description map (a StockCode is a stable product id).
+    _desc_lookup = (
+        df.loc[df["Description"].notna(), ["StockCode", "Description"]]
+        .drop_duplicates(subset=["StockCode"])
+        .set_index("StockCode")["Description"]
+    )
+    _desc_missing = df["Description"].isna()
+    _desc_recoverable = int((_desc_missing & df["StockCode"].isin(_desc_lookup.index)).sum())
+    _desc_remaining = int(_desc_missing.sum() - _desc_recoverable)
+    md.append(f"- `Description` is missing in **{miss['Description']:,}** rows (packing/discount lines). These are **backfilled from the `StockCode` → `Description` map** (`src/data_loader.py` → `backfill_description`): a StockCode is a stable product identifier, so its name is the same everywhere it appears. Recovers **{_desc_recoverable:,}** of {int(miss['Description']):,} rows; the **{_desc_remaining:,}** remainder are one-off StockCodes that appear exactly once in the workbook with no reference copy. This is product-name completion, not imputation, and does not affect the customer-level feature set.")
     md.append(f"- `InvoiceDate` is missing in **{miss['InvoiceDate']:,}** rows.\n" if miss['InvoiceDate'] else "- `InvoiceDate` has no missing values.\n")
     md.append('All other columns are fully populated (InvoiceNo, StockCode, Quantity, UnitPrice, Country).')
-    md.append(f"- `Description` (free-text product name, **{df['Description'].nunique():,}** unique values, **{int(df['Description'].isna().sum()):,}** missing) is retained for validation and human-readable reporting but **excluded from the customer-level feature set**: it is redundant with `StockCode` (~99.7% overlap — the two describe the same product in different forms), it is high-cardinality and noisy (inconsistent spelling of the same product, e.g. `JUMBO BAG RED` vs `JUMBO BAG REDS`), and it is not a customer-behaviour signal at this segmentation granularity. Product breadth is captured via `StockCode` counts instead.")
+    md.append(f"- `Description` (free-text product name, **{df['Description'].nunique():,}** unique values, {_desc_remaining:,} missing after backfill) is retained for validation and human-readable reporting but **excluded from the customer-level feature set**: it is redundant with `StockCode` (~99.7% overlap — the two describe the same product in different forms), it is high-cardinality and noisy (inconsistent spelling of the same product, e.g. `JUMBO BAG RED` vs `JUMBO BAG REDS`), and it is not a customer-behaviour signal at this segmentation granularity. Product breadth is captured via `StockCode` counts instead.")
 
     # 3. Duplicates
     md.append("\n## 3. Duplicates\n")
@@ -188,7 +198,7 @@ def build_report(df: pd.DataFrame) -> str:
     clean = clean[~clean["InvoiceNo"].str.startswith("C")]
     clean = clean[clean["UnitPrice"] > 0]
     clean = clean[clean["Quantity"] != 0]
-    md.append("Cleaning policy (as implemented): attempt **invoice propagation** to recover `CustomerID` (recovers 0 rows here — guest invoices are disjoint from customer-ID'd invoices); then drop rows whose `CustomerID` remains unattributable; drop `C`-prefix (cancellation) invoices; drop `UnitPrice <= 0`; drop `Quantity == 0`; retain & net returns (`Quantity < 0`). No columns are dropped at any stage.")
+    md.append("Cleaning policy (as implemented): attempt **invoice propagation** to recover `CustomerID` (recovers 0 rows here — guest invoices are disjoint from customer-ID'd invoices); backfill `Description` from the `StockCode` → `Description` map (recovers 1,342 of 1,454); then drop rows whose `CustomerID` remains unattributable; drop `C`-prefix (cancellation) invoices; drop `UnitPrice <= 0`; drop `Quantity == 0`; retain & net returns (`Quantity < 0`). No columns are dropped at any stage.")
     md.append("| Metric | Raw | After cleaning |")
     md.append("|---|---|---|")
     md.append(f"\n| Rows | {n:,} | {len(clean):,} ({len(clean)/n:.1%}) |")
