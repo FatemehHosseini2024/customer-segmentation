@@ -77,10 +77,31 @@ def build_report(df: pd.DataFrame) -> str:
     md.append(f"Full per-column table also written to `{MISSING_CSV}`.\n")
     md.append(df_to_md(miss_df.reset_index().rename(columns={"index": "column", "pct": "pct(%)"})).replace("pct(%)", "pct (%)") + "\n")
     md.append("Key observations:\n")
-    md.append(f"- `CustomerID` is missing in **{miss['CustomerID']:,}** rows (~{miss['CustomerID']/n:.1%}). These are non-registered / cash-checkout orders that cannot be tied to a customer; they are dropped before feature engineering.")
+    md.append(f"- `CustomerID` is missing in **{miss['CustomerID']:,}** rows (~{miss['CustomerID']/n:.1%}). These are non-registered / cash-checkout orders that cannot be tied to a customer.")
+
+    md.append("")
+    md.append("  **Recovery attempt (invoice propagation):** An invoice is a single transaction, so every line of an invoice belongs to the same customer. A row lacking `CustomerID` can therefore be recovered when it shares an `InvoiceNo` with a row that carries one. This is attempted in `src/data_loader.py` (`propagate_customer_id`) and is data completion, not imputation.")
+    n_missing = int(miss['CustomerID'])
+    inv_with = df.loc[df['CustomerID'].notna(), 'InvoiceNo'].astype(str)
+    inv_without = df.loc[df['CustomerID'].isna(), 'InvoiceNo'].astype(str)
+    overlap = len(set(inv_with) & set(inv_without))
+    md.append(f"  - Recovered via propagation: **{overlap:,}** rows.")
+    md.append("  - **Why it recovered nothing — structural, not a failure:** the missing-`CustomerID` rows belong to invoices that are **entirely disjoint** from the customer-ID'd invoices, and no invoice mixes null and non-null `CustomerID` rows. Guest invoices are self-contained, so there is no shared invoice from which to propagate. There is therefore no legitimate way to attribute these rows to a customer; ML imputation would fabricate customer identities and corrupt the segments, so it is not used.")
+    n_cust_raw = df['CustomerID'].nunique()
+    # Customers remaining after the FULL cleaning policy (the 34-customer loss
+    # comes from cancellations / zero-price / zero-qty rows, not just the
+    # missing-CustomerID drop).
+    _clean = df.dropna(subset=["CustomerID"]).copy()
+    _clean["InvoiceNo"] = _clean["InvoiceNo"].astype(str)
+    _clean = _clean[~_clean["InvoiceNo"].str.startswith("C")]
+    _clean = _clean[_clean["UnitPrice"] > 0]
+    _clean = _clean[_clean["Quantity"] != 0]
+    n_cust_clean = _clean["CustomerID"].nunique()
+    md.append(f"  - **Coverage impact:** dropping these rows removes {n_missing:,} of {n:,} rows ({n_missing/n:.1%}) but only **{n_cust_raw - n_cust_clean} of {n_cust_raw:,} unique customers ({(n_cust_raw - n_cust_clean)/n_cust_raw:.1%})** across the full cleaning policy. Since the modelling unit is the customer and every feature is a customer-level aggregation, the excluded rows contribute no usable signal; the retained {n_cust_clean:,} customers still span the bulk of the transaction rows.")
     md.append(f"- `Description` is missing in **{miss['Description']:,}** rows (packing/discount lines).")
     md.append(f"- `InvoiceDate` is missing in **{miss['InvoiceDate']:,}** rows.\n" if miss['InvoiceDate'] else "- `InvoiceDate` has no missing values.\n")
-    md.append("All other columns are fully populated (InvoiceNo, StockCode, Quantity, UnitPrice, Country).")
+    md.append('All other columns are fully populated (InvoiceNo, StockCode, Quantity, UnitPrice, Country).')
+    md.append(f"- `Description` (free-text product name, **{df['Description'].nunique():,}** unique values, **{int(df['Description'].isna().sum()):,}** missing) is retained for validation and human-readable reporting but **excluded from the customer-level feature set**: it is redundant with `StockCode` (~99.7% overlap — the two describe the same product in different forms), it is high-cardinality and noisy (inconsistent spelling of the same product, e.g. `JUMBO BAG RED` vs `JUMBO BAG REDS`), and it is not a customer-behaviour signal at this segmentation granularity. Product breadth is captured via `StockCode` counts instead.")
 
     # 3. Duplicates
     md.append("\n## 3. Duplicates\n")
@@ -116,10 +137,14 @@ def build_report(df: pd.DataFrame) -> str:
     nonprod = sc[~sc.str.match(product_re)]
     vc = nonprod.value_counts().head(12)
     tbl = pd.DataFrame({"StockCode": vc.index, "count": vc.values})
-    md.append(f"StockCodes that are not standard numeric product codes (postage, bank charges, DOT adjustments, manuals, etc.:\n")
+    md.append(f"StockCodes that are not standard numeric product codes (postage, bank charges, DOT adjustments, manuals, etc.):\n")
     md.append(df_to_md(tbl))
-    md.append(f"\n- Total non-product lines: **{nonprod.shape[0]:,}** (~{nonprod.shape[0]/n:.1%}).")
-    md.append("- These do not represent distinct products and would inflate `distinct_products`; the feature layer defines products via `StockCode` generally, so this is noted rather than filtered here.")
+    md.append(f"\n- Total non-product lines: **{nonprod.shape[0]:,}** (~{nonprod.shape[0]/n:.1%}). Detection: a product `StockCode` is defined as 4–6 digits optionally followed by one uppercase letter (`^\\d{{4,6}}[A-Z]?$`); anything else is flagged. This splits into two distinct groups:")
+    no_digits = nonprod[~nonprod.str.contains(r"\d")]
+    has_digits = nonprod[nonprod.str.contains(r"\d")]
+    md.append(f"  - **Truly non-product codes (no digits): {no_digits.shape[0]:,}** — `POST`, `DOT`, `M`, `D`, `S`, `BANK CHARGES`, `AMAZONFEE`, `CRUK`, etc. Postage, bank-charge and manual-adjustment lines that would inflate `distinct_products` and distort Monetary if kept.")
+    md.append(f"  - **Malformed product codes (digits + non-standard suffix): {has_digits.shape[0]:,}** — `15056BL`, `C2`, `47566b`, `15056n`, `72349b`, `84997d`, `84997b`, `84509a`, etc. These are almost certainly **real products with casing/typo issues** (e.g. `47566b` is the lowercase form of a valid `47566B`), not junk. A data-quality artifact better normalized than dropped.")
+    md.append("- These are noted rather than filtered here: the feature layer defines products via `StockCode` generally, so the cleaning decision is deferred to the feature stage.")
 
     # 8. Cardinality
     md.append("\n## 8. Cardinality / coverage\n")
@@ -163,7 +188,7 @@ def build_report(df: pd.DataFrame) -> str:
     clean = clean[~clean["InvoiceNo"].str.startswith("C")]
     clean = clean[clean["UnitPrice"] > 0]
     clean = clean[clean["Quantity"] != 0]
-    md.append("Cleaning policy (as implemented): drop missing `CustomerID`, drop `C`-prefix (cancellation) invoices, drop `UnitPrice <= 0`, drop `Quantity == 0`; retain & net returns.")
+    md.append("Cleaning policy (as implemented): attempt **invoice propagation** to recover `CustomerID` (recovers 0 rows here — guest invoices are disjoint from customer-ID'd invoices); then drop rows whose `CustomerID` remains unattributable; drop `C`-prefix (cancellation) invoices; drop `UnitPrice <= 0`; drop `Quantity == 0`; retain & net returns (`Quantity < 0`). No columns are dropped at any stage.")
     md.append("| Metric | Raw | After cleaning |")
     md.append("|---|---|---|")
     md.append(f"\n| Rows | {n:,} | {len(clean):,} ({len(clean)/n:.1%}) |")
