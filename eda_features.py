@@ -32,15 +32,17 @@ CORR_CSV = REPORT_DIR / "feature_corr.csv"
 
 FEATURES = [
     "recency", "frequency", "monetary", "avg_order_value",
-    "basket_size", "distinct_products",
-    "cancellation_rate", "tenure", "cadence",
+    "distinct_products", "cancellation_rate", "tenure",
 ]
-# Display-only: constant features shown in the report but excluded from clustering.
-DISPLAY_FEATURES = FEATURES + ["return_rate"]
+# Dropped as redundant: basket_size (r=0.93 with avg_order_value),
+# cadence (r=0.89 with recency). Kept in DISPLAY_FEATURES for
+# documentation, excluded from clustering.
+DROPPED_FEATURES = ["basket_size", "cadence"]
+# Display-only: non-clustering features shown in the report.
+DISPLAY_FEATURES = FEATURES + DROPPED_FEATURES + ["return_rate"]
 LOG_FEATURES = [
     "recency", "frequency", "monetary", "avg_order_value",
-    "basket_size", "distinct_products",
-    "cancellation_rate", "cadence",
+    "distinct_products", "cancellation_rate",
 ]
 
 

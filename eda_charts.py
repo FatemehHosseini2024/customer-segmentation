@@ -49,8 +49,7 @@ def main() -> None:
 
     # 3. Correlation heatmap
     features = ["recency", "frequency", "monetary", "avg_order_value",
-                "basket_size", "distinct_products", "cancellation_rate",
-                "tenure", "cadence"]
+                "distinct_products", "cancellation_rate", "tenure"]
     corr = feat[features].corr()
     fig, ax = plt.subplots(figsize=(7, 6))
     im = ax.imshow(corr.values, cmap="RdBu_r", vmin=-1, vmax=1)
@@ -73,8 +72,7 @@ def main() -> None:
     from sklearn.preprocessing import StandardScaler
 
     log_features = ["recency", "frequency", "monetary", "avg_order_value",
-                    "basket_size", "distinct_products",
-                    "cancellation_rate", "cadence"]
+                    "distinct_products", "cancellation_rate"]
     X = feat[["tenure"]].copy()
     for f in log_features:
         X[f] = np.log1p(feat[f].clip(lower=0))
