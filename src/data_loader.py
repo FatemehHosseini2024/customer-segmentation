@@ -17,8 +17,11 @@ Loading policy
    from customer-ID'd invoices, so propagation recovers nothing and no
    legitimate attribution source exists. The modelling unit is the
    customer, so these rows contribute no usable signal.
-7. **No columns are dropped at any stage.** Remaining row-level decisions
-   (cancellations, zero price, zero quantity) are explicit and opt-in,
+7. Drop rows with **non-positive `UnitPrice`** (<=0): these are
+   manual adjustments/credits or data-entry errors, not sales
+   (returns are encoded as negative Quantity with a positive price).
+8. **No columns are dropped at any stage.** Remaining row-level
+   decisions (cancellations, zero quantity) are explicit and opt-in,
    so the caller can reproduce the baseline at any time.
 
 Structural note (verified on this dataset)
@@ -182,6 +185,28 @@ def drop_missing_customer_id(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def drop_nonpositive_price(df: pd.DataFrame) -> pd.DataFrame:
+    """Drop rows with non-positive UnitPrice (<= 0).
+
+    A non-positive unit price is not a valid sale price: returns in this
+    dataset are encoded as negative Quantity with a *positive* UnitPrice,
+    so a zero/negative price indicates a manual adjustment, credit, or
+    data-entry error rather than a purchase. Retaining these rows would
+    produce negative or zero line values that distort Monetary.
+
+    Verified on the raw data: 2,517 of 541,909 rows (0.5%).
+
+    Only rows are dropped; no columns are removed.
+    """
+    if "UnitPrice" not in df.columns:
+        return df
+
+    n_bad = int((df["UnitPrice"] <= 0).sum())
+    out = df[df["UnitPrice"] > 0]
+    print(f"[data_loader] non-positive UnitPrice rows dropped: {n_bad:,}")
+    return out
+
+
 def load_clean(path: Path = DATA_PATH) -> pd.DataFrame:
     """Load raw data and apply all recovery/cleaning steps.
 
@@ -190,16 +215,19 @@ def load_clean(path: Path = DATA_PATH) -> pd.DataFrame:
     - Description backfilled from StockCode -> Description map
     - Exact duplicate rows dropped (keep-first)
     - Rows with missing CustomerID dropped (guest checkouts, unrecoverable)
+    - Non-positive UnitPrice rows dropped (adjustments/errors, not sales)
     - StockCode normalized (lowercase suffix -> uppercase)
     - Non-product codes flagged via `is_product` column (fees, postage, adjustments)
-    - C-invoices, UnitPrice <= 0, Quantity == 0 are NOT dropped here;
-      caller decides (opt-in).
+    - C-invoices and Quantity == 0 are NOT dropped here; caller decides
+      (opt-in). C-invoices are retained so cancellation behavior can be
+      engineered as a segmentation dimension.
     """
     df = load_raw(path)
     df = propagate_customer_id(df)
     df = backfill_description(df)
     df = drop_exact_duplicates(df)
     df = drop_missing_customer_id(df)
+    df = drop_nonpositive_price(df)
     df = normalize_stockcode(df)
     df = filter_non_product_codes(df)
     return df
