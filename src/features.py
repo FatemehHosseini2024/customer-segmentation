@@ -10,6 +10,7 @@ Behavioral dimensions:
     return_rate (negative-quantity lines on normal invoices),
     cancellation_count / cancellation_value / cancellation_rate
     (from C-invoices — the cancellation-behavior dimension)
+    has_cancellation (binary flag = any C-invoice; used for clustering)
 
 Temporal:
     tenure (days since first purchase), cadence (days between purchases)
@@ -88,6 +89,10 @@ def build_customer_features(df: pd.DataFrame, snapshot=None) -> pd.DataFrame:
     feat["cancellation_rate"] = (
         feat["cancellation_count"] / (feat["frequency"] + feat["cancellation_count"])
     )
+
+    # Binary cancellation flag for clustering (denominator-independent —
+    # avoids the small-denominator confound of the continuous rate).
+    feat["has_cancellation"] = (feat["cancellation_count"] > 0).astype(int)
 
     feat["distinct_products"] = feat["distinct_products"].fillna(0).astype(int)
 
