@@ -32,17 +32,20 @@ CORR_CSV = REPORT_DIR / "feature_corr.csv"
 
 FEATURES = [
     "recency", "frequency", "monetary", "avg_order_value",
-    "distinct_products", "cancellation_rate", "tenure",
+    "distinct_products", "has_cancellation", "tenure",
 ]
-# Dropped as redundant: basket_size (r=0.93 with avg_order_value),
-# cadence (r=0.89 with recency). Kept in DISPLAY_FEATURES for
-# documentation, excluded from clustering.
-DROPPED_FEATURES = ["basket_size", "cadence"]
+# Dropped from clustering: basket_size (r=0.93 with avg_order_value),
+# cadence (r=0.89 with recency), cancellation_rate (confounded with low
+# frequency — see reports/decision_tests.md). Kept in DISPLAY_FEATURES
+# for documentation / post-hoc profiling.
+DROPPED_FEATURES = ["basket_size", "cadence", "cancellation_rate"]
 # Display-only: non-clustering features shown in the report.
-DISPLAY_FEATURES = FEATURES + DROPPED_FEATURES + ["return_rate"]
+DISPLAY_FEATURES = FEATURES + DROPPED_FEATURES + ["return_rate",
+                                                  "cancellation_count",
+                                                  "cancellation_value"]
 LOG_FEATURES = [
     "recency", "frequency", "monetary", "avg_order_value",
-    "distinct_products", "cancellation_rate",
+    "distinct_products",
 ]
 
 

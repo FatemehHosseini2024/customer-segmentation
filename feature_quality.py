@@ -35,11 +35,11 @@ QUALITY_CSV = REPORT_DIR / "feature_quality.csv"
 
 FEATURES = [
     "recency", "frequency", "monetary", "avg_order_value",
-    "distinct_products", "cancellation_rate", "tenure",
+    "distinct_products", "has_cancellation", "tenure",
 ]
 LOG_FEATURES = [
     "recency", "frequency", "monetary", "avg_order_value",
-    "distinct_products", "cancellation_rate",
+    "distinct_products",
 ]
 
 
