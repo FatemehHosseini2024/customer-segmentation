@@ -6,12 +6,11 @@
 
 | feature | eta^2 | single-feature silhouette | best k | zero share |
 |---|---|---|---|---|
-| monetary | 0.673 | 0.566 | 2 | 0% |
-| frequency | 0.673 | 0.781 | 5 | 0% |
-| tenure | 0.641 | 0.672 | 2 | 0% |
-| recency | 0.521 | 0.583 | 4 | 2% |
-| distinct_products | 0.516 | 0.556 | 2 | 0% |
-| avg_order_value | 0.247 | 0.540 | 2 | 0% |
+| frequency | 0.723 | 0.781 | 5 | 0% |
+| tenure | 0.682 | 0.672 | 2 | 0% |
+| monetary | 0.619 | 0.566 | 2 | 0% |
+| recency | 0.576 | 0.583 | 4 | 2% |
+| distinct_products | 0.505 | 0.556 | 2 | 0% |
 
 ## How to read this
 
@@ -21,6 +20,6 @@
 
 ## Verdict
 
-- Strongest segment drivers (eta^2): monetary, frequency, tenure, recency.
-- Weakest: recency, distinct_products, avg_order_value.
+- Strongest segment drivers (eta^2): frequency, tenure, monetary, recency.
+- Weakest: monetary, recency, distinct_products.
 - Redundant pairs to collapse: avg_order_value/basket_size (r=0.93), recency/cadence (r=0.89).

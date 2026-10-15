@@ -48,7 +48,7 @@ def main() -> None:
     plt.close(fig)
 
     # 3. Correlation heatmap
-    features = ["recency", "frequency", "monetary", "avg_order_value",
+    features = ["recency", "frequency", "monetary",
                 "distinct_products", "tenure"]
     corr = feat[features].corr()
     fig, ax = plt.subplots(figsize=(7, 6))
@@ -71,7 +71,7 @@ def main() -> None:
     from sklearn.metrics import silhouette_score
     from sklearn.preprocessing import StandardScaler
 
-    log_features = ["recency", "frequency", "monetary", "avg_order_value",
+    log_features = ["recency", "frequency", "monetary",
                     "distinct_products"]
     X = feat[["tenure", "has_cancellation"]].copy()
     for f in log_features:

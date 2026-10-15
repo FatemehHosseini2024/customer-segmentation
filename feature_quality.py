@@ -34,11 +34,11 @@ REPORT_PATH = REPORT_DIR / "feature_quality.md"
 QUALITY_CSV = REPORT_DIR / "feature_quality.csv"
 
 FEATURES = [
-    "recency", "frequency", "monetary", "avg_order_value",
+    "recency", "frequency", "monetary",
     "distinct_products", "tenure",
 ]
 LOG_FEATURES = [
-    "recency", "frequency", "monetary", "avg_order_value",
+    "recency", "frequency", "monetary",
     "distinct_products",
 ]
 

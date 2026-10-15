@@ -31,7 +31,7 @@ REPORT_PATH = REPORT_DIR / "feature_eda_report.md"
 CORR_CSV = REPORT_DIR / "feature_corr.csv"
 
 FEATURES = [
-    "recency", "frequency", "monetary", "avg_order_value",
+    "recency", "frequency", "monetary",
     "distinct_products", "tenure",
 ]
 # Dropped from clustering: basket_size (r=0.93 with avg_order_value),
@@ -44,7 +44,7 @@ DISPLAY_FEATURES = FEATURES + DROPPED_FEATURES + ["return_rate",
                                                   "cancellation_count",
                                                   "cancellation_value"]
 LOG_FEATURES = [
-    "recency", "frequency", "monetary", "avg_order_value",
+    "recency", "frequency", "monetary",
     "distinct_products",
 ]
 
@@ -112,7 +112,7 @@ def main() -> None:
 
     # 3. Outliers
     md.append("\n## 3. Outliers\n")
-    for f in ["monetary", "frequency", "avg_order_value"]:
+    for f in ["monetary", "frequency"]:
         q99 = feat[f].quantile(0.99)
         top = feat[f].max()
         n_over = int((feat[f] > q99).sum())

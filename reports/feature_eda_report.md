@@ -1,6 +1,6 @@
 # Feature-level EDA — customer feature table
 
-> Customers: **4,338** | Features: **6**
+> Customers: **4,338** | Features: **5**
 
 ## 1. Distributions
 
@@ -9,7 +9,6 @@
 | recency | 91.54 | 100.01 | 50.00 | 1.25 |
 | frequency | 4.27 | 7.70 | 2.00 | 12.07 |
 | monetary | 2,048.69 | 8,985.23 | 668.57 | 19.34 |
-| avg_order_value | 417.65 | 1,796.51 | 291.94 | 41.69 |
 | distinct_products | 61.37 | 85.29 | 35.00 | 6.92 |
 | tenure | 222.31 | 117.89 | 248.00 | -0.37 |
 | basket_size | 252.46 | 1,312.77 | 161.00 | 48.01 |
@@ -19,7 +18,7 @@
 | cancellation_count | 0.83 | 2.15 | 0.00 | 8.83 |
 | cancellation_value | 137.92 | 2,957.92 | 0.00 | 47.47 |
 
-- **Right-skewed (|skew| > 1): recency, frequency, monetary, avg_order_value, distinct_products, basket_size, cadence, cancellation_rate, cancellation_count, cancellation_value** — log-transform these before distance-based clustering.
+- **Right-skewed (|skew| > 1): recency, frequency, monetary, distinct_products, basket_size, cadence, cancellation_rate, cancellation_count, cancellation_value** — log-transform these before distance-based clustering.
 - `tenure` is the only near-symmetric feature (skew -0.37).
 - `return_rate` is **constant 0** — every negative-quantity line in the raw data sat on a C-invoice or a guest checkout, so no returns survive the cleaning policy. Excluded from the clustering feature set: a constant cannot separate clusters.
 
@@ -34,24 +33,23 @@ Full matrix written to `reports\feature_corr.csv`. Strongest absolute pairs (|r|
 
 - `monetary`: p99 = 19,780.49, max = 280,206.02 (44 customers above p99) — wholesale/bulk buyers.
 - `frequency`: p99 = 30.00, max = 209.00 (42 customers above p99) — wholesale/bulk buyers.
-- `avg_order_value`: p99 = 2,031.16, max = 84,236.25 (44 customers above p99) — wholesale/bulk buyers.
 - Recommendation: log-transform + StandardScaler; optionally cap at p99 before clustering.
 
 ## 4. k-selection (elbow + silhouette)
 
 | k | inertia | silhouette |
 |---|---|---|
-| 2 | 16,738 | 0.315 |
-| 3 | 13,813 | 0.271 |
-| 4 | 11,842 | 0.236 |
-| 5 | 10,661 | 0.218 |
-| 6 | 9,708 | 0.221 |
-| 7 | 8,990 | 0.220 |
-| 8 | 8,434 | 0.211 |
-| 9 | 7,938 | 0.203 |
-| 10 | 7,554 | 0.200 |
+| 2 | 12,825 | 0.353 |
+| 3 | 9,940 | 0.314 |
+| 4 | 8,219 | 0.283 |
+| 5 | 7,306 | 0.271 |
+| 6 | 6,618 | 0.244 |
+| 7 | 6,159 | 0.234 |
+| 8 | 5,800 | 0.207 |
+| 9 | 5,481 | 0.211 |
+| 10 | 5,220 | 0.207 |
 
-- **Best silhouette: k = 2** (score 0.315).
+- **Best silhouette: k = 2** (score 0.353).
 - Inertia keeps falling with k (expected); silhouette peaks at the natural cluster count. Confirm with business interpretability of the resulting segments.
 
 ## 5. Next steps
