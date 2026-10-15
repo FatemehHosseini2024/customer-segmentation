@@ -1,6 +1,6 @@
 # Feature-level EDA — customer feature table
 
-> Customers: **4,338** | Features: **7**
+> Customers: **4,338** | Features: **6**
 
 ## 1. Distributions
 
@@ -11,7 +11,6 @@
 | monetary | 2,048.69 | 8,985.23 | 668.57 | 19.34 |
 | avg_order_value | 417.65 | 1,796.51 | 291.94 | 41.69 |
 | distinct_products | 61.37 | 85.29 | 35.00 | 6.92 |
-| has_cancellation | 0.36 | 0.48 | 0.00 | 0.59 |
 | tenure | 222.31 | 117.89 | 248.00 | -0.37 |
 | basket_size | 252.46 | 1,312.77 | 161.00 | 48.01 |
 | cadence | 98.02 | 87.59 | 66.71 | 1.46 |
@@ -42,17 +41,17 @@ Full matrix written to `reports\feature_corr.csv`. Strongest absolute pairs (|r|
 
 | k | inertia | silhouette |
 |---|---|---|
-| 2 | 20,040 | 0.305 |
-| 3 | 17,144 | 0.239 |
-| 4 | 15,081 | 0.210 |
-| 5 | 13,310 | 0.236 |
-| 6 | 12,237 | 0.221 |
-| 7 | 11,460 | 0.216 |
-| 8 | 10,712 | 0.220 |
-| 9 | 10,170 | 0.216 |
-| 10 | 9,669 | 0.214 |
+| 2 | 16,738 | 0.315 |
+| 3 | 13,813 | 0.271 |
+| 4 | 11,842 | 0.236 |
+| 5 | 10,661 | 0.218 |
+| 6 | 9,708 | 0.221 |
+| 7 | 8,990 | 0.220 |
+| 8 | 8,434 | 0.211 |
+| 9 | 7,938 | 0.203 |
+| 10 | 7,554 | 0.200 |
 
-- **Best silhouette: k = 2** (score 0.305).
+- **Best silhouette: k = 2** (score 0.315).
 - Inertia keeps falling with k (expected); silhouette peaks at the natural cluster count. Confirm with business interpretability of the resulting segments.
 
 ## 5. Next steps

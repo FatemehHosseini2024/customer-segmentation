@@ -49,7 +49,7 @@ def main() -> None:
 
     # 3. Correlation heatmap
     features = ["recency", "frequency", "monetary", "avg_order_value",
-                "distinct_products", "has_cancellation", "tenure"]
+                "distinct_products", "tenure"]
     corr = feat[features].corr()
     fig, ax = plt.subplots(figsize=(7, 6))
     im = ax.imshow(corr.values, cmap="RdBu_r", vmin=-1, vmax=1)

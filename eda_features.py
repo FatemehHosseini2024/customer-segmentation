@@ -32,7 +32,7 @@ CORR_CSV = REPORT_DIR / "feature_corr.csv"
 
 FEATURES = [
     "recency", "frequency", "monetary", "avg_order_value",
-    "distinct_products", "has_cancellation", "tenure",
+    "distinct_products", "tenure",
 ]
 # Dropped from clustering: basket_size (r=0.93 with avg_order_value),
 # cadence (r=0.89 with recency), cancellation_rate (confounded with low
