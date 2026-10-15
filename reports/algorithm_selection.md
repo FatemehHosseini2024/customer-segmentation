@@ -1,9 +1,9 @@
-# Algorithm selection: K-Means vs Agglomerative clustering
+# Algorithm selection: K-Means vs Agglomerative vs DBSCAN
 
 Features: ['recency', 'frequency', 'monetary', 'distinct_products', 'tenure']
 Customers: 4,338
 
-Preprocessing: log1p on skewed features + StandardScaler on the scaled data.
+Preprocessing: log1p on skewed features + StandardScaler.
 
 ## 1) K-Means: elbow + metrics (k=2..10)
 | k | inertia | silhouette | Davies-Bouldin | Calinski-Harabasz |
@@ -69,11 +69,54 @@ Preprocessing: log1p on skewed features + StandardScaler on the scaled data.
 | complete | 3 | 0.077 | 0.031 |
 | complete | 4 | 0.096 | 0.050 |
 
-## 5) Best silhouette by model
-- K-Means: k=2, silhouette=0.353
-- Agglomerative: linkage=average, k=2, silhouette=0.516
+## 5) DBSCAN: grid search over eps x min_samples
+| eps | min_samples | n_clusters | n_noise | silhouette | Davies-Bouldin | Calinski-Harabasz |
+|---|---|---|---|---|---|---|
+| 0.30 | 3 | 130 | 2095 | -0.217 | 1.025 | 29 |
+| 0.30 | 5 | 41 | 2716 | -0.194 | 1.005 | 32 |
+| 0.30 | 10 | 4 | 3315 | -0.065 | 1.116 | 13 |
+| 0.51 | 3 | 14 | 483 | -0.246 | 1.008 | 161 |
+| 0.51 | 5 | 12 | 687 | -0.262 | 1.014 | 183 |
+| 0.51 | 10 | 3 | 1156 | 0.208 | 1.018 | 909 |
+| 0.72 | 3 | 5 | 133 | -0.016 | 0.891 | 5 |
+| 0.72 | 5 | 2 | 171 | 0.073 | 1.066 | 3 |
+| 0.72 | 10 | 1 | 254 | - | - | - |
+| 0.94 | 3 | 3 | 49 | 0.447 | 0.469 | 24 |
+| 0.94 | 5 | 1 | 72 | - | - | - |
+| 0.94 | 10 | 1 | 102 | - | - | - |
+| 1.15 | 3 | 1 | 20 | - | - | - |
+| 1.15 | 5 | 1 | 25 | - | - | - |
+| 1.15 | 10 | 1 | 38 | - | - | - |
+| 1.36 | 3 | 1 | 9 | - | - | - |
+| 1.36 | 5 | 1 | 9 | - | - | - |
+| 1.36 | 10 | 1 | 16 | - | - | - |
+| 1.57 | 3 | 1 | 7 | - | - | - |
+| 1.57 | 5 | 1 | 7 | - | - | - |
+| 1.57 | 10 | 1 | 10 | - | - | - |
+| 1.79 | 3 | 1 | 3 | - | - | - |
+| 1.79 | 5 | 1 | 5 | - | - | - |
+| 1.79 | 10 | 1 | 5 | - | - | - |
+| 2.00 | 3 | 1 | 2 | - | - | - |
+| 2.00 | 5 | 1 | 2 | - | - | - |
+| 2.00 | 10 | 1 | 4 | - | - | - |
 
-## 6) Interpretability: cluster profiles (original scale means)
+## 6) Bootstrap stability: DBSCAN (B=30, frac=0.8)
+| eps | min_samples | mean ARI | std |
+|---|---|---|---|
+| 0.30 | 3 | 0.885 | 0.010 |
+| 0.30 | 5 | 0.872 | 0.016 |
+| 0.30 | 10 | 0.894 | 0.013 |
+| 0.51 | 3 | 0.933 | 0.011 |
+| 0.51 | 5 | 0.913 | 0.009 |
+| 0.51 | 10 | 0.855 | 0.013 |
+
+## 7) Best silhouette by model
+- K-Means: k=2, silhouette=0.353, DB=1.096, CH=2,997
+- Agglomerative: linkage=average, k=2, silhouette=0.516, DB=0.615, CH=157
+- DBSCAN: eps=0.94, min_samples=3, n_clusters=3, n_noise=49, silhouette=0.447, DB=0.469, CH=24
+
+## 8) Interpretability: cluster profiles (original scale means)
+Profiles shown for K-Means k=2 (best overall: metrics + stability + interpretability).
 
 ### K-Means k=2
 | cluster | recency | frequency | monetary | distinct_products | tenure |
@@ -81,17 +124,13 @@ Preprocessing: log1p on skewed features + StandardScaler on the scaled data.
 | 0 | 33.75 | 8.36 | 4422.04 | 116.08 | 289.04 |
 | 1 | 128.84 | 1.63 | 516.27 | 26.05 | 179.22 |
 
-### K-Means k=3
-| cluster | recency | frequency | monetary | distinct_products | tenure |
-|---|---|---|---|---|---|
-| 0 | 44.06 | 1.65 | 562.68 | 32.96 | 74.72 |
-| 1 | 29.54 | 8.98 | 4807.83 | 121.91 | 298.93 |
-| 2 | 195.61 | 1.84 | 578.23 | 25.42 | 274.86 |
+- C0: frequent, recent, high-spend customers (active/high-value).
+- C1: infrequent, older purchases, low spend (one-off/inactive).
 
-### K-Means k=4
+### DBSCAN eps=0.94, min_samples=3
 | cluster | recency | frequency | monetary | distinct_products | tenure |
 |---|---|---|---|---|---|
-| 0 | 226.91 | 1.42 | 333.75 | 16.25 | 262.4 |
-| 1 | 69.19 | 3.91 | 1584.66 | 69.17 | 275.6 |
-| 2 | 41.97 | 1.57 | 526.27 | 31.23 | 65.33 |
-| 3 | 11.9 | 13.55 | 7918.6 | 162.62 | 317.33 |
+| noise | 47.18 | 27.63 | 42199.04 | 228.27 | 273.04 |
+| 0 | 92.17 | 3.91 | 1517.91 | 58.91 | 221.52 |
+| 1 | 1.0 | 104.0 | 53304.89 | 841.67 | 371.33 |
+| 2 | 3.0 | 41.0 | 52772.77 | 73.0 | 366.0 |
