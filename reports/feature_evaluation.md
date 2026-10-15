@@ -15,28 +15,25 @@ Customers: 4,338 | k=4
 - monetary: var(raw)=80734362.1066, zero=0.000
 - avg_order_value: var(raw)=3227453.0052, zero=0.000
 - distinct_products: var(raw)=7274.1237, zero=0.001
-- has_cancellation: var(raw)=0.2301, zero=0.641
 - tenure: var(raw)=13897.2200, zero=0.001
 
 ## 3) Leave-one-out ablation (vs full)
 | drop | ARI | sil | DB | CH |
 |---|---|---|---|---|
-| recency | 0.319 | 0.250 | 1.362 | 1,682 |
-| frequency | 0.616 | 0.237 | 1.409 | 1,418 |
-| monetary | 0.548 | 0.232 | 1.448 | 1,368 |
-| avg_order_value | 0.677 | 0.241 | 1.337 | 1,845 |
-| distinct_products | 0.677 | 0.229 | 1.436 | 1,528 |
-| has_cancellation | 0.761 | 0.236 | 1.302 | 1,731 |
-| tenure | 0.424 | 0.262 | 1.310 | 1,789 |
+| recency | 0.466 | 0.258 | 1.202 | 2,018 |
+| frequency | 0.518 | 0.246 | 1.230 | 1,658 |
+| monetary | 0.633 | 0.239 | 1.273 | 1,616 |
+| avg_order_value | 0.724 | 0.283 | 1.141 | 2,368 |
+| distinct_products | 0.757 | 0.262 | 1.220 | 1,864 |
+| tenure | 0.342 | 0.236 | 1.302 | 2,007 |
 
-## 4) Stability (bootstrap ARI vs full-data reference)
+## 4) Stability (bootstrap ARI)
 | feature set | mean ARI | std |
 |---|---|---|
-| all | 0.915 | 0.044 |
-| -recency | 0.956 | 0.099 |
-| -frequency | 0.949 | 0.037 |
-| -monetary | 0.975 | 0.013 |
-| -avg_order_value | 0.938 | 0.093 |
-| -distinct_products | 0.757 | 0.178 |
-| -has_cancellation | 0.918 | 0.107 |
-| -tenure | 0.970 | 0.017 |
+| all | 0.919 | 0.087 |
+| -recency | 0.966 | 0.023 |
+| -frequency | 0.961 | 0.038 |
+| -monetary | 0.911 | 0.085 |
+| -avg_order_value | 0.961 | 0.021 |
+| -distinct_products | 0.903 | 0.108 |
+| -tenure | 0.918 | 0.061 |
