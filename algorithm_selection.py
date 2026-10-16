@@ -114,9 +114,13 @@ def main():
     )
     lines.append("|---|---|---|---|---|")
     inertias = []
+    km_labels = {}
+    km_metrics = {}
     for k in K_RANGE:
         lab = labels_kmeans(X, k)
+        km_labels[k] = lab
         sil, db, ch, _, _ = metrics(X, lab)
+        km_metrics[k] = (sil, db, ch)
         km = KMeans(n_clusters=k, n_init=10, random_state=RANDOM_STATE).fit(X)
         inertias.append(km.inertia_)
         lines.append(
@@ -126,9 +130,11 @@ def main():
     lines.append("\n## 2) Bootstrap stability: K-Means (B=30, frac=0.8)")
     lines.append("| k | mean ARI | std |")
     lines.append("|---|---|---|")
+    km_stab = {}
     for k in [2, 3, 4]:
         lab_ref = labels_kmeans(X, k)
         mean_a, std_a = bootstrap_ari(X, lab_ref, lambda x: labels_kmeans(x, k))
+        km_stab[k] = mean_a
         lines.append(f"| {k} | {mean_a:.3f} | {std_a:.3f} |")
 
     # ---------- Section 3: Agglomerative ----------
@@ -138,9 +144,11 @@ def main():
     )
     lines.append("|---|---|---|---|---|")
     agg_scores = {}
+    agg_labels = {}
     for linkage in LINKAGES:
         for k in K_RANGE:
             lab = labels_agg(X, k, linkage)
+            agg_labels[(linkage, k)] = lab
             res = metrics(X, lab)
             if res:
                 sil, db, ch, _, _ = res
@@ -153,12 +161,14 @@ def main():
     lines.append("\n## 4) Bootstrap stability: Agglomerative (B=30, frac=0.8)")
     lines.append("| linkage | k | mean ARI | std |")
     lines.append("|---|---|---|---|")
+    agg_stab = {}
     for linkage in LINKAGES:
         for k in [2, 3, 4]:
             lab_ref = labels_agg(X, k, linkage)
             mean_a, std_a = bootstrap_ari(
                 X, lab_ref, lambda x: labels_agg(x, k, linkage)
             )
+            agg_stab[(linkage, k)] = mean_a
             lines.append(f"| {linkage} | {k} | {mean_a:.3f} | {std_a:.3f} |")
 
     # ---------- Section 4: DBSCAN ----------
@@ -168,9 +178,11 @@ def main():
     )
     lines.append("|---|---|---|---|---|---|---|")
     dbscan_results = []
+    dbscan_labels = {}
     for eps in EPS_GRID:
         for min_s in MIN_SAMPLES_GRID:
             lab = labels_dbscan(X, eps, min_s)
+            dbscan_labels[(eps, min_s)] = lab
             n_clusters = len(set(lab)) - (1 if -1 in lab else 0)
             n_noise = int((lab == -1).sum())
             res = metrics(X, lab)
@@ -189,14 +201,22 @@ def main():
                 )
 
     lines.append("\n## 6) Bootstrap stability: DBSCAN (B=30, frac=0.8)")
-    lines.append("| eps | min_samples | mean ARI | std |")
-    lines.append("|---|---|---|---|")
-    for eps, min_s, *_ in dbscan_results[:6]:
+    lines.append("| eps | min_samples | n_clusters | mean ARI | std |")
+    lines.append("|---|---|---|---|---|")
+    dbscan_stab = {}
+    dbscan_valid_multi = [
+        r for r in dbscan_results
+        if r[2] is not None and r[2] >= 2 and r[4] is not None
+    ]
+    for eps, min_s, nc, noise, sil, db, ch in dbscan_valid_multi:
         lab_ref = labels_dbscan(X, eps, min_s)
         mean_a, std_a = bootstrap_ari(
             X, lab_ref, lambda x: labels_dbscan(x, eps, min_s)
         )
-        lines.append(f"| {eps:.2f} | {min_s} | {mean_a:.3f} | {std_a:.3f} |")
+        dbscan_stab[(eps, min_s)] = mean_a
+        lines.append(
+            f"| {eps:.2f} | {min_s} | {nc} | {mean_a:.3f} | {std_a:.3f} |"
+        )
 
     # ---------- Section 5: Best picks ----------
     lines.append("\n## 7) Best silhouette by model")
@@ -227,42 +247,118 @@ def main():
     else:
         lines.append("- DBSCAN: no valid clustering found (single cluster or all noise).")
 
-    # ---------- Section 6: Interpretability ----------
-    lines.append("\n## 8) Interpretability: cluster profiles (original scale means)")
+    # ---------- Section: Compare solutions with more than 2 clusters ----------
+    lines.append("\n## 8) Comparison: solutions with more than 2 clusters")
     lines.append(
-        "Profiles shown for K-Means k=2 (best overall: metrics + stability + interpretability)."
+        "| model | n_clusters | min cluster size | silhouette | Davies-Bouldin | Calinski-Harabasz | noise | bootstrap ARI |"
     )
-    lab_km = labels_kmeans(X, 2)
-    dfp = feat[FEATURES].copy()
-    dfp["cluster"] = lab_km
-    m = dfp.groupby("cluster")[FEATURES].mean().round(2)
-    lines.append("\n### K-Means k=2")
-    lines.append("| cluster | " + " | ".join(FEATURES) + " |")
-    lines.append("|" + "---|" * (len(FEATURES) + 1))
-    for idx, row in m.iterrows():
-        vals = " | ".join(str(v) for v in row[FEATURES].values)
-        lines.append(f"| {idx} | {vals} |")
-    lines.append(
-        "\n- C0: frequent, recent, high-spend customers (active/high-value)."
-    )
-    lines.append(
-        "- C1: infrequent, older purchases, low spend (one-off/inactive)."
+    lines.append("|---|---|---|---|---|---|---|---|")
+
+    def min_cluster_size(lab):
+        vals, counts = np.unique(lab, return_counts=True)
+        counts = counts[vals != -1]
+        return int(counts.min()) if len(counts) else 0
+
+    cand = []
+    for k in K_RANGE:
+        if k < 3:
+            continue
+        sil, db, ch = km_metrics[k]
+        cand.append(
+            (
+                "K-Means", k, min_cluster_size(km_labels[k]), sil, db, ch, 0,
+                km_stab.get(k), km_labels[k],
+            )
+        )
+    for linkage in LINKAGES:
+        for k in K_RANGE:
+            if k < 3:
+                continue
+            res = agg_scores.get((linkage, k))
+            if not res or res[0] is None:
+                continue
+            sil, db, ch = res
+            cand.append(
+            (
+                f"Agglomerative ({linkage})", k, min_cluster_size(agg_labels[(linkage, k)]),
+                sil, db, ch, 0, agg_stab.get((linkage, k)),
+                agg_labels[(linkage, k)],
+            )
+        )
+    for eps, min_s, nc, noise, sil, db, ch in dbscan_results:
+        if nc is None or nc <= 2 or sil is None:
+            continue
+        cand.append(
+            (
+                f"DBSCAN eps={eps:.2f}, min_samples={min_s}", nc,
+                min_cluster_size(dbscan_labels[(eps, min_s)]), sil, db, ch,
+                noise, dbscan_stab.get((eps, min_s)),
+                dbscan_labels[(eps, min_s)],
+            )
+        )
+
+    cand.sort(
+        key=lambda c: (
+            c[3] if c[3] is not None else -1,
+            -(c[4] if c[4] is not None else 0),
+        ),
+        reverse=True,
     )
 
-    if valid_db:
-        best_db = max(valid_db, key=lambda r: r[4])
-        eps_b, ms_b, _, _, _, _, _ = best_db
-        lab_db = labels_dbscan(X, eps_b, ms_b)
-        dfd = feat[FEATURES].copy()
-        dfd["cluster"] = lab_db
-        md = dfd.groupby("cluster")[FEATURES].mean().round(2)
-        lines.append(f"\n### DBSCAN eps={eps_b:.2f}, min_samples={ms_b}")
+    for name, nc, mcs, sil, db, ch, noise, stab, _ in cand:
+        stab_s = f"{stab:.3f}" if stab is not None else "n/a"
+        lines.append(
+            f"| {name} | {nc} | {mcs} | {sil:.3f} | {db:.3f} | {ch:,.0f} | "
+            f"{noise} | {stab_s} |"
+        )
+
+    lines.append(
+        "\nNo single model is declared the winner. Internal metrics reward DBSCAN's "
+        "geometric separation of a few extreme points from one dense mass, but its "
+        "3-cluster solution is largely one blob plus two wholesale-buyer clusters and "
+        "49 noise points — not a behaviorally distinct segmentation for marketing. "
+        "DBSCAN is best used to flag outliers and wholesale customers, while "
+        "K-Means / Ward provide the general segmentation. Choose k with a rule set "
+        "in advance (e.g., min cluster ≥ 5% of customers, stability ≥ 0.85, and top-2 "
+        "on at least two internal metrics). Report k=2 as a coarse split alongside."
+    )
+
+    # ---------- Section: K-Means vs Ward agreement ----------
+    lines.append("\n## 9) K-Means vs Ward agreement (adjusted Rand index)")
+    lines.append("| k | ARI |")
+    lines.append("|---|---|")
+    for k in [3, 4]:
+        lab_km = labels_kmeans(X, k)
+        lab_ward = labels_agg(X, k, "ward")
+        ari = adjusted_rand_score(lab_km, lab_ward)
+        lines.append(f"| {k} | {ari:.3f} |")
+
+    # ---------- Section: Interpretability ----------
+    lines.append("\n## 10) Interpretability: cluster profiles (original scale means)")
+    lines.append("Profiles shown for K-Means k=3 and k=4, and DBSCAN eps=0.94/min_samples=3.")
+    for k in [3, 4]:
+        lab = labels_kmeans(X, k)
+        dfp = feat[FEATURES].copy()
+        dfp["cluster"] = lab
+        m = dfp.groupby("cluster")[FEATURES].mean().round(2)
+        lines.append(f"\n### K-Means k={k}")
         lines.append("| cluster | " + " | ".join(FEATURES) + " |")
         lines.append("|" + "---|" * (len(FEATURES) + 1))
-        for idx, row in md.iterrows():
-            label = "noise" if idx == -1 else str(idx)
+        for idx, row in m.iterrows():
             vals = " | ".join(str(v) for v in row[FEATURES].values)
-            lines.append(f"| {label} | {vals} |")
+            lines.append(f"| {idx} | {vals} |")
+
+    lab_db = labels_dbscan(X, 0.94, 3)
+    dfd = feat[FEATURES].copy()
+    dfd["cluster"] = lab_db
+    md = dfd.groupby("cluster")[FEATURES].mean().round(2)
+    lines.append("\n### DBSCAN eps=0.94, min_samples=3 (k=3, incl. noise)")
+    lines.append("| cluster | " + " | ".join(FEATURES) + " |")
+    lines.append("|" + "---|" * (len(FEATURES) + 1))
+    for idx, row in md.iterrows():
+        label = "noise" if idx == -1 else str(idx)
+        vals = " | ".join(str(v) for v in row[FEATURES].values)
+        lines.append(f"| {label} | {vals} |")
 
     Path(REPORT_PATH).write_text("\n".join(lines), encoding="utf-8")
     print("wrote", REPORT_PATH)
