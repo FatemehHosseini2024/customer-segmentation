@@ -65,4 +65,7 @@ cluster
 
 Bootstrap (B=30, frac=0.8): monetary cluster-mean spread std across resamples = 1.004
 
-ARI between k=3 and k=4 partitions: 0.543
+## Marketing labels (k=3; interpretive, not findings)
+- Cluster 1 (n=1513): High-value active/loyal (low recency, high frequency/monetary, long tenure).
+- Cluster 0 (n=1321): Mid-value recent (moderate recency/frequency/monetary, short tenure).
+- Cluster 2 (n=1504): At-risk/inactive (high recency, low frequency/monetary, long tenure).
