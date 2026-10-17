@@ -1,5 +1,7 @@
 # Final evaluation: K-Means (k=3 primary, k=4 alternative)
 
+**Primary model:** K-Means (k=3) fitted on the **original preprocessed feature space** (log1p on skewed features + StandardScaler), not PCA-transformed features. PCA was used only as a diagnostic (structure/loadings/visualization) and did not change the primary segmentation.
+
 ## K-Means k=3
 | metric | value |
 |---|---|
